@@ -1,4 +1,4 @@
-#include "mainwindow.h"
+﻿#include "mainwindow.h"
 #include "ui_mainwindow.h"
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -35,8 +35,13 @@ MainWindow::MainWindow(QWidget *parent) :
               "id_etiq INTEGER"
               ");");
 
+
     connect(ui->actionNuevaTarea, SIGNAL(triggered()), this, SLOT(onAddTarea()));
     connect(ui->tblTareas, SIGNAL(cellChanged(int,int)), this, SLOT(onTareasCellChanged(int,int)));
+    connect(ui->actionNuevaCateg, SIGNAL(triggered()), this, SLOT(onAddCategoria()));
+    connect(ui->tblCateg, SIGNAL(cellChanged(int,int)), this, SLOT(onCategoriaCellChanged(int)));
+    // hacer lo de categoria
+    //
     connect(ui->comboCategoria, SIGNAL(currentIndexChanged(int)), this, SLOT(onLoadTareas()));
 
     addingTarea_ = false;
@@ -79,8 +84,21 @@ void MainWindow::onAddTarea()
     ui->tblTareas->setItem(ui->tblTareas->rowCount()-1, 0, new QTableWidgetItem(""));
     ui->tblTareas->setItem(ui->tblTareas->rowCount()-1, 1, new QTableWidgetItem(""));
 
-
     addingTarea_ = false;
+}
+
+void MainWindow::onAddCategoria(){
+    addingCategoria_ = true;
+
+    ui->tblCateg->insertRow(ui->tblTareas->rowCount());
+    QTableWidgetItem* item = new QTableWidgetItem("");
+    item->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
+    item->setCheckState(Qt::Unchecked);
+    ui->tblCateg->setItem(ui->tblCateg->rowCount()-1, 2, item);
+    ui->tblCateg->setItem(ui->tblCateg->rowCount()-1, 0, new QTableWidgetItem(""));
+    ui->tblCateg->setItem(ui->tblCateg->rowCount()-1, 1, new QTableWidgetItem(""));
+
+    addingCategoria_ = false;
 }
 
 void MainWindow::onTareasCellChanged(int row, int column)
@@ -115,6 +133,32 @@ void MainWindow::onTareasCellChanged(int row, int column)
     }
 
     addingTarea_ = false;
+}
+
+void MainWindow::onCategoriaCellChanged(int row){
+    if(addingCategoria_)
+        return;
+
+    addingCategoria_ = true;
+    QSqlQuery query;
+
+    if(ui->tblCateg->item(row, 0)->data(Qt::UserRole).isNull()){
+        query = db_.exec("INSERT INTO categorias (name,descripcion) "
+                 "VALUES ("+QString("'%1','%2');" )\
+                 .arg(ui->tblCateg->item(row, 0)->text())\
+                 .arg(ui->tblCateg->item(row, 1)->text()));
+        ui->tblCateg->item(row, 0)->setData(Qt::UserRole, query.lastInsertId());
+
+
+    }else{
+        query = db_.exec("UPDATE categorias"
+                "SET " + QString("name='%1',descripcion='%2' ")
+                .arg(ui->tblCateg->item(row, 0)->text())\
+                .arg(ui->tblCateg->item(row, 1)->text()) +
+                "WHERE id = " + ui->tblCateg->item(row, 0)->data(Qt::UserRole).toString() + ";");
+    }
+
+    addingCategoria_ = false;
 }
 
 void MainWindow::onLoadTareas()
@@ -152,4 +196,39 @@ void MainWindow::onLoadTareas()
     //Activamos el sorting en la tabla de categorias
     ui->tblTareas->setSortingEnabled(true);
     addingTarea_ = false;
+}
+
+void MainWindow::onLoadCategorias(){
+    addingCategoria_ = true;
+
+    QSqlQuery q = db_.exec("SELECT * "
+                           "FROM categorias;");
+
+    while(q.next()){
+       //int rowNumber = ui->tblCateg->rowCount();
+        int id = GetField(q, "id").toInt();
+
+        /*
+        ui->comboCategoria->addItem(GetField(q, "name").toString(), GetField(q, "id").toInt());
+        ui->tblCateg->insertRow(rowNumber);
+        QTableWidgetItem* item = new QTableWidgetItem(GetField(q, "name").toString());
+        QTableWidgetItem* item2 = new QTableWidgetItem(GetField(q, "descripcion").toString());
+        item->setData(Qt::UserRole, id);
+        item2->setData(Qt::UserRole, id);
+        ui->tblCateg->setItem(rowNumber, 0, item);
+        ui->tblCateg->setItem(rowNumber, 1, item2);
+        */
+
+        int rowNumber = ui->tblCateg->rowCount();
+        ui->tblCateg->insertRow(rowNumber);
+        QTableWidgetItem* nombre = new QTableWidgetItem(GetField(q, "name").toString());
+        ui->tblCateg->setItem(rowNumber, 0, nombre);
+
+        QTableWidgetItem* descripcion = new QTableWidgetItem(GetField(q, "descripcion").toString());
+        ui->tblCateg->setItem(rowNumber, 1, descripcion);
+
+    }
+
+    ui->tblCateg->setSortingEnabled(true);
+    addingCategoria_ = false;
 }
